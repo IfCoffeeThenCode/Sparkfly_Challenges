@@ -12,6 +12,40 @@ import (
 
 var once sync.Once
 
+// Challenge 1
+func Dupes() {
+	var workers sync.WaitGroup
+
+	const path = "./testdata"
+
+	files, err := GetFiles(path)
+	if err != nil {
+		log.Fatalf("Error getting list of files from %s: %s", path, err)
+	}
+
+	codes := make(chan string)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	for _, filename := range files {
+		workers.Add(1)
+		go Extract(ctx, filename, codes, &workers)
+	}
+
+	go Monitor(&workers, codes)
+
+	done := make(chan string, 1)
+
+	go ReportDuplicates(cancel, codes, done)
+
+	duplicate := <-done
+	if duplicate == "" {
+		log.Printf("No Duplicates")
+	} else {
+		log.Printf("Found duplicate: %s", duplicate)
+	}
+}
+
 // Extract codes from a specified file and stop either at end of file or if a duplicate was found
 func Extract(ctx context.Context,
 	filename string,
