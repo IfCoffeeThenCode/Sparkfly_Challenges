@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"sync"
 
@@ -20,16 +21,18 @@ func dupes() {
 
 	codes := make(chan string)
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	for _, filename := range files {
 		workers.Add(1)
-		go duplicatefinder.Worker(filename, codes, &workers)
+		go duplicatefinder.Extract(ctx, filename, codes, &workers)
 	}
 
 	go duplicatefinder.Monitor(&workers, codes)
 
 	done := make(chan string, 1)
 
-	go duplicatefinder.Duplicates(codes, done)
+	go duplicatefinder.ReportDuplicates(cancel, codes, done)
 
 	duplicate := <-done
 	if duplicate == "" {

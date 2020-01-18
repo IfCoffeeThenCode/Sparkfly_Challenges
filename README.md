@@ -11,3 +11,18 @@ Code challenge for application to SparkFly developer position
 
     b. The uncompressed data is provided to your code as an io.ReadCloser (input to your code)
 You are encouraged to mock out these inputs and outputs to simplify your solution
+
+## Solutions
+
+### Unique codes in CSV files
+
+#### Notes
+
+I'm not thrilled with how this ended up (I feel like there's a spare
+goroutine), but comparing the reported linecount for each file with the actual
+number of lines in the file, it does cancel all the subprocesses as soon as a
+duplicate entry is found. 
+  
+#### Possible Improvements
+
+1. Use another CSV module that can map columns -> struct entries like encoding/json
