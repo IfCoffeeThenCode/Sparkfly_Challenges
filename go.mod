@@ -2,4 +2,7 @@ module github.com/IfCoffeeThenCode/Sparkfly_Challenges
 
 go 1.13
 
-require golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
+require (
+	github.com/stretchr/testify v1.4.0
+	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
+)

@@ -26,3 +26,9 @@ duplicate entry is found.
 #### Possible Improvements
 
 1. Use another CSV module that can map columns -> struct entries like encoding/json
+
+### S3 Compressor
+
+#### Possible Improvements
+
+1. Add test cases around failures
