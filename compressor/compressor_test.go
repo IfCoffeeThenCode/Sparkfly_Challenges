@@ -1,64 +1,81 @@
 package compressor
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCompress(t *testing.T) {
-	assert := assert.New(t)
-
-	compressor, err := NewGzipCompressor()
-	assert.Nil(err)
-
+	// test holds the input and expected output of a test condition
 	type test struct {
-		in  string
+		// setup does any initialization for inputs to a test, like opening files
+		setup func() (input io.ReadCloser, size int64, err error)
+
+		// Output goes here. In this case, since I'm not testing that Go's gzip
+		// package works (thanks, Google!) I'm just making sure that either no
+		// errors were returned or that they match what I expect
 		err error
 	}
 
+	// This pattern is shamelessly stolen from https://github.com/golang/go/wiki/TableDrivenTests,
+	// but it served us well at Pursuant Health
 	tests := map[string]test{
-		"good": test{
-			in:  "This is a test file that will be deleted",
+		"succeeds from file": test{
+			setup: func() (io.ReadCloser, int64, error) {
+				filename := "../testdata/TestProcessEligibleChannel2_0_TestProcessEligibleChannel2_0_CODES.csv"
+				instat, err := os.Stat(filename)
+				if err != nil {
+					return nil, 0, err
+				}
+
+				file, err := os.Open(filename)
+				return file, instat.Size(), err
+			},
+			err: nil,
+		},
+		"succeeds from buffer": test{
+			setup: func() (io.ReadCloser, int64, error) {
+				input := strings.NewReader("This is a buffer!")
+				return ioutil.NopCloser(input), input.Size(), nil
+			},
 			err: nil,
 		},
 	}
 
-	for _, tt := range tests {
-		inTempfile, err := ioutil.TempFile("", "compress_in")
-		inTempfile.Write([]byte(tt.in))
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assertions := require.New(t)
 
-		// assert that the compressor did in fact write a file with no errors
-		out, err := compressor.Compress(ioutil.NopCloser(strings.NewReader(tt.in)))
-		assert.NotEmpty(out)
-		assert.Nil(err)
+			// Always use a new compressor
+			compressor, err := NewGzipCompressor()
+			assertions.Nil(err)
 
-		infile := inTempfile.Name()
-		outfile := compressor.outTempfile.Name()
+			input, inSize, err := tt.setup()
+			assertions.Nil(err)
 
-		// check file sizes (did we actually compress?)
-		instat, err := os.Stat(infile)
-		assert.Nil(err)
+			// assert that the compressor did in fact write a file with no errors
+			out, err := compressor.Compress(input)
+			assertions.NotEmpty(out)
+			assertions.Nil(err)
 
-		outstat, err := os.Stat(outfile)
-		assert.Nil(err)
+			// check file sizes (did we actually compress?)
+			outfile := compressor.tempfile.Name()
+			outstat, err := os.Stat(outfile)
+			assertions.Nil(err)
 
-		assert.LessOrEqual(outstat.Size(), instat.Size())
+			assertions.LessOrEqual(outstat.Size(), inSize)
 
-		err = compressor.Cleanup()
-		assert.Nil(err)
+			// make sure Cleanup works
+			err = compressor.Cleanup()
+			assertions.Nil(err)
 
-		err = os.Remove(inTempfile.Name())
-		assert.Nil(err)
-
-		// make sure cleanup actually did cleanup
-		_, err = os.Stat(outfile)
-		assert.True(os.IsNotExist(err))
-
-		_, err = os.Stat(infile)
-		assert.True(os.IsNotExist(err))
+			_, err = os.Stat(outfile)
+			assertions.True(os.IsNotExist(err))
+		})
 	}
 }

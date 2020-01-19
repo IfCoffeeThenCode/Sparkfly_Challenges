@@ -8,37 +8,42 @@ import (
 )
 
 type gzipCompressor struct {
-	outTempfile *os.File
-	outWriter   io.Writer
+	tempfile *os.File
+	writer   io.Writer
 }
 
+// NewGzipCompressor returns creates a tempfile-backed gzip writer
 func NewGzipCompressor() (*gzipCompressor, error) {
 	var (
 		comp gzipCompressor
 		err  error
 	)
 
-	comp.outTempfile, err = ioutil.TempFile("", "compress_out")
+	// "compress_out" could be changed if need be
+	comp.tempfile, err = ioutil.TempFile("", "compress_out")
 	if err != nil {
 		return nil, err
 	}
 
-	comp.outWriter = gzip.NewWriter(comp.outTempfile)
+	comp.writer = gzip.NewWriter(comp.tempfile)
 
 	return &comp, nil
 }
 
+// Compress takes any readable buffer or file and returns a compressed tempfile
 func (c *gzipCompressor) Compress(in io.ReadCloser) (io.Reader, error) {
-	_, err := io.Copy(c.outWriter, in)
+	// Nice that gzip.Writer implements io.Writer
+	_, err := io.Copy(c.writer, in)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.outTempfile, nil
+	return c.tempfile, nil
 }
 
+// Cleanup removes the underlying tempfile for a given compressor
 func (c *gzipCompressor) Cleanup() error {
-	err := os.Remove(c.outTempfile.Name())
+	err := os.Remove(c.tempfile.Name())
 	if err != nil {
 		return err
 	}
