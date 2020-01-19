@@ -41,33 +41,33 @@ func TestCompress(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			innerAssert := require.New(t)
+			assertions := require.New(t)
 
 			// Always use a new compressor
 			compressor, err := NewGzipCompressor()
-			innerAssert.Nil(err)
+			assertions.Nil(err)
 
 			input, inSize, err := tt.setup()
-			innerAssert.Nil(err)
+			assertions.Nil(err)
 
 			// assert that the compressor did in fact write a file with no errors
 			out, err := compressor.Compress(input)
-			innerAssert.NotEmpty(out)
-			innerAssert.Nil(err)
+			assertions.NotEmpty(out)
+			assertions.Nil(err)
 
 			// check file sizes (did we actually compress?)
 			outfile := compressor.tempfile.Name()
 			outstat, err := os.Stat(outfile)
-			innerAssert.Nil(err)
+			assertions.Nil(err)
 
-			innerAssert.LessOrEqual(outstat.Size(), inSize)
+			assertions.LessOrEqual(outstat.Size(), inSize)
 
 			// make sure Cleanup works
 			err = compressor.Cleanup()
-			innerAssert.Nil(err)
+			assertions.Nil(err)
 
 			_, err = os.Stat(outfile)
-			innerAssert.True(os.IsNotExist(err))
+			assertions.True(os.IsNotExist(err))
 		})
 	}
 }
