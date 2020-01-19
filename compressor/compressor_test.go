@@ -1,64 +1,73 @@
 package compressor
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCompress(t *testing.T) {
-	assert := assert.New(t)
-
-	compressor, err := NewGzipCompressor()
-	assert.Nil(err)
-
 	type test struct {
-		in  string
-		err error
+		setup func() (io.ReadCloser, int64, error)
+		err   error
 	}
 
 	tests := map[string]test{
-		"good": test{
-			in:  "This is a test file that will be deleted",
+		"succeeds from file": test{
+			setup: func() (io.ReadCloser, int64, error) {
+				filename := "../testdata/TestProcessEligibleChannel2_0_TestProcessEligibleChannel2_0_CODES.csv"
+				instat, err := os.Stat(filename)
+				if err != nil {
+					return nil, 0, err
+				}
+
+				file, err := os.Open(filename)
+				return file, instat.Size(), err
+			},
+			err: nil,
+		},
+		"succeeds from buffer": test{
+			setup: func() (io.ReadCloser, int64, error) {
+				input := strings.NewReader("This is a buffer!")
+				return ioutil.NopCloser(input), input.Size(), nil
+			},
 			err: nil,
 		},
 	}
 
-	for _, tt := range tests {
-		inTempfile, err := ioutil.TempFile("", "compress_in")
-		inTempfile.Write([]byte(tt.in))
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			innerAssert := require.New(t)
 
-		// assert that the compressor did in fact write a file with no errors
-		out, err := compressor.Compress(ioutil.NopCloser(strings.NewReader(tt.in)))
-		assert.NotEmpty(out)
-		assert.Nil(err)
+			// Always use a new compressor
+			compressor, err := NewGzipCompressor()
+			innerAssert.Nil(err)
 
-		infile := inTempfile.Name()
-		outfile := compressor.outTempfile.Name()
+			input, inSize, err := tt.setup()
+			innerAssert.Nil(err)
 
-		// check file sizes (did we actually compress?)
-		instat, err := os.Stat(infile)
-		assert.Nil(err)
+			// assert that the compressor did in fact write a file with no errors
+			out, err := compressor.Compress(input)
+			innerAssert.NotEmpty(out)
+			innerAssert.Nil(err)
 
-		outstat, err := os.Stat(outfile)
-		assert.Nil(err)
+			// check file sizes (did we actually compress?)
+			outfile := compressor.tempfile.Name()
+			outstat, err := os.Stat(outfile)
+			innerAssert.Nil(err)
 
-		assert.LessOrEqual(outstat.Size(), instat.Size())
+			innerAssert.LessOrEqual(outstat.Size(), inSize)
 
-		err = compressor.Cleanup()
-		assert.Nil(err)
+			// make sure Cleanup works
+			err = compressor.Cleanup()
+			innerAssert.Nil(err)
 
-		err = os.Remove(inTempfile.Name())
-		assert.Nil(err)
-
-		// make sure cleanup actually did cleanup
-		_, err = os.Stat(outfile)
-		assert.True(os.IsNotExist(err))
-
-		_, err = os.Stat(infile)
-		assert.True(os.IsNotExist(err))
+			_, err = os.Stat(outfile)
+			innerAssert.True(os.IsNotExist(err))
+		})
 	}
 }
