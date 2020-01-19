@@ -16,6 +16,9 @@ func TestCompress(t *testing.T) {
 		// setup does any initialization for inputs to a test, like opening files
 		setup func() (input io.ReadCloser, size int64, err error)
 
+		// cleanup does any teardown that might be required after setup()
+		cleanup func(in io.ReadCloser) error
+
 		// Output goes here. In this case, since I'm not testing that Go's gzip
 		// package works (thanks, Google!) I'm just making sure that either no
 		// errors were returned or that they match what I expect
@@ -36,12 +39,18 @@ func TestCompress(t *testing.T) {
 				file, err := os.Open(filename)
 				return file, instat.Size(), err
 			},
+			cleanup: func(in io.ReadCloser) error {
+				return in.Close()
+			},
 			err: nil,
 		},
 		"succeeds from buffer": test{
 			setup: func() (io.ReadCloser, int64, error) {
 				input := strings.NewReader("This is a buffer!")
 				return ioutil.NopCloser(input), input.Size(), nil
+			},
+			cleanup: func(in io.ReadCloser) error {
+				return in.Close()
 			},
 			err: nil,
 		},
@@ -76,6 +85,9 @@ func TestCompress(t *testing.T) {
 
 			_, err = os.Stat(outfile)
 			assertions.True(os.IsNotExist(err))
+
+			err = tt.cleanup(input)
+			assertions.Nil(err)
 		})
 	}
 }
