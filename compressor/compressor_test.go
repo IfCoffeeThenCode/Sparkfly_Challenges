@@ -11,11 +11,19 @@ import (
 )
 
 func TestCompress(t *testing.T) {
+	// test holds the input and expected output of a test condition
 	type test struct {
-		setup func() (io.ReadCloser, int64, error)
-		err   error
+		// setup does any initialization for inputs to a test, like opening files
+		setup func() (input io.ReadCloser, size int64, err error)
+
+		// Output goes here. In this case, since I'm not testing that Go's gzip
+		// package works (thanks, Google!) I'm just making sure that either no
+		// errors were returned or that they match what I expect
+		err error
 	}
 
+	// This pattern is shamelessly stolen from https://github.com/golang/go/wiki/TableDrivenTests,
+	// but it served us well at Pursuant Health
 	tests := map[string]test{
 		"succeeds from file": test{
 			setup: func() (io.ReadCloser, int64, error) {
